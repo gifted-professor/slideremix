@@ -1,0 +1,5 @@
+{
+  "name": "SlideRemix",
+  "description": "AI 驱动的幻灯片重构引擎，可将静态幻灯片图像转换为可编辑的结构化数据。",
+  "requestFramePermissions": []
+}

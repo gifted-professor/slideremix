@@ -1,0 +1,136 @@
+import React, { useRef, useEffect, useState } from 'react';
+import { SlideElement, ElementSettings } from '../types';
+import ElementToolbar from './ElementToolbar';
+
+interface SelectionOverlayProps {
+  elements: SlideElement[];
+  selectedId: string | null;
+  elementSettings: Record<string, ElementSettings>;
+  onUpdateSettings: (id: string, settings: Partial<ElementSettings>) => void;
+  onOpenEditor?: (id: string) => void;
+  onClose: () => void;
+}
+
+const SelectionOverlay: React.FC<SelectionOverlayProps> = ({ 
+  elements, 
+  selectedId, 
+  elementSettings,
+  onUpdateSettings,
+  onOpenEditor,
+  onClose
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const initialElemPos = useRef<{ x: number; y: number } | null>(null);
+
+  const element = selectedId ? elements.find(el => el.id === selectedId) : null;
+  const settings = (selectedId && elementSettings[selectedId]) ? elementSettings[selectedId] : { renderMode: 'svg' } as ElementSettings;
+
+  const currentX = element ? (settings.x !== undefined ? settings.x : element.position.x) : 0;
+  const currentY = element ? (settings.y !== undefined ? settings.y : element.position.y) : 0;
+
+  // Apply crop insets to the selection box to match visual image
+  const insetL = settings.cropInsets?.left || 0;
+  const insetR = settings.cropInsets?.right || 0;
+  const insetT = settings.cropInsets?.top || 0;
+  const insetB = settings.cropInsets?.bottom || 0;
+
+  const finalX = currentX + insetL;
+  const finalY = currentY + insetT;
+  const finalW = (element ? element.position.width : 0) - (insetL + insetR);
+  const finalH = (element ? element.position.height : 0) - (insetT + insetB);
+
+  // Drag handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!element || !selectedId) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    // We want to update the BASE x/y (without insets), so we track currentX/Y
+    initialElemPos.current = { x: currentX, y: currentY };
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !dragStartPos.current || !initialElemPos.current || !selectedId) return;
+
+      const deltaX = e.clientX - dragStartPos.current.x;
+      const deltaY = e.clientY - dragStartPos.current.y;
+
+      // Convert pixel delta to SVG coordinate delta
+      const container = document.querySelector('.aspect-video'); 
+      if (!container) return;
+      
+      const rect = container.getBoundingClientRect();
+      const scaleX = 1000 / rect.width;
+      const scaleY = 562.5 / rect.height;
+
+      const newX = initialElemPos.current.x + (deltaX * scaleX);
+      const newY = initialElemPos.current.y + (deltaY * scaleY);
+
+      onUpdateSettings(selectedId, { x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      dragStartPos.current = null;
+      initialElemPos.current = null;
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, selectedId, onUpdateSettings]);
+
+  if (!selectedId || !element) return null;
+
+  // Convert 1000x562.5 coordinates to percentages for rendering
+  const left = (finalX / 1000) * 100;
+  const top = (finalY / 562.5) * 100;
+  const width = (finalW / 1000) * 100;
+  const height = (finalH / 562.5) * 100;
+
+  return (
+    <div className="absolute inset-0 pointer-events-none z-10 overflow-visible">
+      {/* Selection Box */}
+      <div
+        className={`absolute border-2 border-indigo-500 shadow-[0_0_0_2px_rgba(99,102,241,0.2)] pointer-events-auto transition-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{
+          left: `${left}%`,
+          top: `${top}%`,
+          width: `${width}%`,
+          height: `${height}%`,
+        }}
+        onMouseDown={handleMouseDown}
+        onClick={(e) => e.stopPropagation()} 
+      >
+        {/* Resize Handles (Visual only for now) */}
+        <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-indigo-500 rounded-full shadow-sm"></div>
+        <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-indigo-500 rounded-full shadow-sm"></div>
+        <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-indigo-500 rounded-full shadow-sm"></div>
+        <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-indigo-500 rounded-full shadow-sm"></div>
+
+        {/* Toolbar - Prevent drag propagation from toolbar */}
+        <div onMouseDown={(e) => e.stopPropagation()}>
+          <ElementToolbar 
+            element={element}
+            settings={settings}
+            onUpdateSettings={(s) => onUpdateSettings(selectedId, s)}
+            onOpenEditor={() => onOpenEditor && onOpenEditor(selectedId)}
+            onClose={onClose}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SelectionOverlay;
