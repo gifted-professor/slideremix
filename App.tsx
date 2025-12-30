@@ -113,6 +113,45 @@ const App: React.FC = () => {
     return cropped.url;
   };
 
+  const ensureImageGenerated = async (id: string, prev: ElementSettings, next: ElementSettings) => {
+    if (!result || !base64Original || !naturalSize) return null;
+
+    // Check if we need to generate/update image
+    const shouldGenerate = !imageByElementId[id] || 
+                           prev.renderMode !== 'image' || 
+                           prev.inflateAmount !== next.inflateAmount ||
+                           prev.removeBg !== next.removeBg ||
+                           prev.cropInsets !== next.cropInsets ||
+                           prev.eraseRegions !== next.eraseRegions ||
+                           prev.erasePaths !== next.erasePaths;
+
+    if (shouldGenerate) {
+       const el = result.elements.find(e => e.id === id);
+       if (el) {
+          let out: { base64: string; url: string } | null = null;
+          
+          // Try remix if available (and not just doing simple crop adjustment)
+          if (apiKey && !next.inflateAmount && !next.removeBg && !next.cropInsets && !next.eraseRegions && !next.erasePaths) {
+            try {
+              const gen = await remixElementImage(base64Original, el, visualStyle, apiKey);
+              out = { base64: gen, url: `data:image/png;base64,${gen}` };
+            } catch {}
+          }
+          
+          if (!out) {
+            const url = await generateElementImage(id, next);
+            if (url) {
+              const base64 = url.replace(/^data:image\/png;base64,/, "");
+              out = { base64, url };
+            }
+          }
+          
+          return out;
+       }
+    }
+    return null;
+  };
+
   const handleElementSettingsUpdate = async (id: string, newSettings: Partial<ElementSettings>) => {
     if (!result) return;
     const prev = elementSettingsMap[id] || { renderMode: 'svg' };
@@ -124,42 +163,42 @@ const App: React.FC = () => {
     
     // Image generation logic
     if (next.renderMode === 'image') {
-       // Check if we need to generate/update image
-       const shouldGenerate = !imageByElementId[id] || 
-                              prev.renderMode !== 'image' || 
-                              prev.inflateAmount !== next.inflateAmount ||
-                              prev.removeBg !== next.removeBg ||
-                              prev.cropInsets !== next.cropInsets ||
-                              prev.eraseRegions !== next.eraseRegions ||
-                              prev.erasePaths !== next.erasePaths;
-
-       if (shouldGenerate && base64Original && naturalSize) {
-          const el = result.elements.find(e => e.id === id);
-          if (el) {
-             let out: { base64: string; url: string } | null = null;
-             
-             // Try remix if available (and not just doing simple crop adjustment)
-             if (apiKey && !next.inflateAmount && !next.removeBg && !next.cropInsets && !next.eraseRegions && !next.erasePaths) {
-               try {
-                 const gen = await remixElementImage(base64Original, el, visualStyle, apiKey);
-                 out = { base64: gen, url: `data:image/png;base64,${gen}` };
-               } catch {}
-             }
-             
-             if (!out) {
-               const url = await generateElementImage(id, next);
-               if (url) {
-                 const base64 = url.replace(/^data:image\/png;base64,/, "");
-                 out = { base64, url };
-               }
-             }
-             
-             if (out) {
-               setImageByElementId(prev => ({ ...prev, [id]: out! }));
-             }
-          }
+       const out = await ensureImageGenerated(id, prev, next);
+       if (out) {
+         setImageByElementId(prev => ({ ...prev, [id]: out! }));
        }
     }
+  };
+
+  const handleConvertAllToImage = async () => {
+    if (!result) return;
+    
+    const newSettingsMap = { ...elementSettingsMap };
+    const updates: Promise<void>[] = [];
+    
+    // Find all raster images
+    const imageElements = result.elements.filter(e => e.type === 'raster_image');
+    
+    // Process them in parallel
+    const generatedImages: Record<string, { url: string; base64?: string }> = {};
+
+    await Promise.all(imageElements.map(async (el) => {
+       const prev = newSettingsMap[el.id] || { renderMode: 'svg' };
+       // Skip if already image mode
+       if (prev.renderMode === 'image') return;
+
+       const next: ElementSettings = { ...prev, renderMode: 'image' };
+       newSettingsMap[el.id] = next;
+       
+       const out = await ensureImageGenerated(el.id, prev, next);
+       if (out) {
+         generatedImages[el.id] = out;
+       }
+    }));
+    
+    setElementSettingsMap(newSettingsMap);
+    setImageByElementId(prev => ({ ...prev, ...generatedImages }));
+    recomputeHiddenTexts(newSettingsMap);
   };
 
   const toggleTextHidden = (id: string) => {
@@ -276,6 +315,13 @@ const App: React.FC = () => {
           </h2>
           {status === 'success' && (
             <div className="flex gap-2">
+              <button 
+                onClick={handleConvertAllToImage}
+                className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+              >
+                <Layout size={16} />
+                显示所有图片
+              </button>
               <button 
                 onClick={() => setShowText(!showText)}
                 className={`flex items-center gap-2 ${showText ? 'bg-slate-200 text-slate-800' : 'bg-white'} border border-slate-300 px-4 py-2 rounded-lg text-sm transition-colors`}

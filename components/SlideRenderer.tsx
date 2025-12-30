@@ -53,6 +53,8 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
             // Use override position if available
             const x = settings.x !== undefined ? settings.x : position.x;
             const y = settings.y !== undefined ? settings.y : position.y;
+            const w = settings.width !== undefined ? settings.width : position.width;
+            const h = settings.height !== undefined ? settings.height : position.height;
 
             // Apply crop insets to the bounding box to maintain 1:1 visual scale
             const insetL = settings.cropInsets?.left || 0;
@@ -62,8 +64,8 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
 
             const finalX = x + insetL;
             const finalY = y + insetT;
-            const finalW = position.width - (insetL + insetR);
-            const finalH = position.height - (insetT + insetB);
+            const finalW = w - (insetL + insetR);
+            const finalH = h - (insetT + insetB);
 
             // 1. Vector Shapes (Rects, Circles, Background Panels)
             if (type === 'vector_shape') {
@@ -85,10 +87,10 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
                 return (
                   <ellipse
                     {...commonProps}
-                    cx={x + position.width / 2}
-                    cy={y + position.height / 2}
-                    rx={position.width / 2}
-                    ry={position.height / 2}
+                    cx={x + w / 2}
+                    cy={y + h / 2}
+                    rx={w / 2}
+                    ry={h / 2}
                   />
                 );
               }
@@ -98,8 +100,8 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
                   {...commonProps}
                   x={x}
                   y={y}
-                  width={position.width}
-                  height={position.height}
+                  width={w}
+                  height={h}
                   rx={el.shape_type === 'rounded_rect' || style.corner_radius ? (style.corner_radius || 10) : 0}
                 />
               );
@@ -176,8 +178,8 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
                   key={id}
                   x={x}
                   y={y}
-                  width={position.width}
-                  height={position.height + 10}
+                  width={w}
+                  height={h + 10}
                   style={{ overflow: 'visible' }}
                 >
                   <div

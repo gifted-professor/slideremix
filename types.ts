@@ -42,6 +42,8 @@ export interface ElementSettings {
   fillColor?: string;
   x?: number;
   y?: number;
+  width?: number;
+  height?: number;
   hidden?: boolean;
   cropInsets?: { top: number; bottom: number; left: number; right: number };
   erasePaths?: { x: number; y: number }[][]; // Array of paths, each path is array of points (0-100 scale)

@@ -28,6 +28,8 @@ const SelectionOverlay: React.FC<SelectionOverlayProps> = ({
 
   const currentX = element ? (settings.x !== undefined ? settings.x : element.position.x) : 0;
   const currentY = element ? (settings.y !== undefined ? settings.y : element.position.y) : 0;
+  const currentW = element ? (settings.width !== undefined ? settings.width : element.position.width) : 0;
+  const currentH = element ? (settings.height !== undefined ? settings.height : element.position.height) : 0;
 
   // Apply crop insets to the selection box to match visual image
   const insetL = settings.cropInsets?.left || 0;
@@ -37,8 +39,8 @@ const SelectionOverlay: React.FC<SelectionOverlayProps> = ({
 
   const finalX = currentX + insetL;
   const finalY = currentY + insetT;
-  const finalW = (element ? element.position.width : 0) - (insetL + insetR);
-  const finalH = (element ? element.position.height : 0) - (insetT + insetB);
+  const finalW = currentW - (insetL + insetR);
+  const finalH = currentH - (insetT + insetB);
 
   // Drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -98,6 +100,10 @@ const SelectionOverlay: React.FC<SelectionOverlayProps> = ({
   const width = (finalW / 1000) * 100;
   const height = (finalH / 562.5) * 100;
 
+  // Determine toolbar position based on element position
+  // If element is in the top 40% of the slide, show toolbar below
+  const toolbarPosition = finalY < 225 ? 'bottom' : 'top';
+
   return (
     <div className="absolute inset-0 pointer-events-none z-10 overflow-visible">
       {/* Selection Box */}
@@ -126,6 +132,7 @@ const SelectionOverlay: React.FC<SelectionOverlayProps> = ({
             onUpdateSettings={(s) => onUpdateSettings(selectedId, s)}
             onOpenEditor={() => onOpenEditor && onOpenEditor(selectedId)}
             onClose={onClose}
+            position={toolbarPosition}
           />
         </div>
       </div>

@@ -8,9 +8,17 @@ interface ElementToolbarProps {
   onUpdateSettings: (settings: Partial<ElementSettings>) => void;
   onOpenEditor?: () => void;
   onClose: () => void;
+  position?: 'top' | 'bottom';
 }
 
-const ElementToolbar: React.FC<ElementToolbarProps> = ({ element, settings, onUpdateSettings, onOpenEditor, onClose }) => {
+const ElementToolbar: React.FC<ElementToolbarProps> = ({ 
+  element, 
+  settings, 
+  onUpdateSettings, 
+  onOpenEditor, 
+  onClose,
+  position = 'top' 
+}) => {
   const isImage = settings.renderMode === 'image';
 
   const getIcon = () => {
@@ -30,7 +38,13 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({ element, settings, onUp
   };
 
   return (
-    <div className="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] bg-white rounded-xl shadow-xl border border-slate-200 p-2 flex flex-col gap-2 min-w-[200px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+    <div 
+      className={`absolute left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-xl border border-slate-200 p-2 flex flex-col gap-2 min-w-[200px] z-50 animate-in fade-in duration-200 ${
+        position === 'top' 
+          ? 'bottom-[calc(100%+8px)] slide-in-from-bottom-2' 
+          : 'top-[calc(100%+8px)] slide-in-from-top-2'
+      }`}
+    >
       {/* Header / Title */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-1">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
@@ -63,6 +77,33 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({ element, settings, onUp
             <ImageIcon size={14} />
             Image
           </button>
+        </div>
+      )}
+
+      {/* Size Controls - For non-text elements */}
+      {element.type !== 'text' && (
+        <div className="flex items-center gap-2 px-1 pt-1 border-t border-slate-100 mt-1">
+             <span className="text-[10px] text-slate-400 font-medium uppercase w-8">Size</span>
+             <div className="flex gap-2 flex-1">
+               <div className="flex items-center gap-1 flex-1">
+                  <span className="text-[9px] text-slate-400">W</span>
+                  <input 
+                    type="number"
+                    value={Math.round(settings.width !== undefined ? settings.width : element.position.width)}
+                    onChange={(e) => onUpdateSettings({ width: Math.max(1, parseInt(e.target.value) || 0) })}
+                    className="w-full h-5 text-[10px] bg-slate-50 border border-slate-200 rounded px-1 text-center"
+                  />
+               </div>
+               <div className="flex items-center gap-1 flex-1">
+                  <span className="text-[9px] text-slate-400">H</span>
+                  <input 
+                    type="number"
+                    value={Math.round(settings.height !== undefined ? settings.height : element.position.height)}
+                    onChange={(e) => onUpdateSettings({ height: Math.max(1, parseInt(e.target.value) || 0) })}
+                    className="w-full h-5 text-[10px] bg-slate-50 border border-slate-200 rounded px-1 text-center"
+                  />
+               </div>
+             </div>
         </div>
       )}
 
@@ -177,7 +218,13 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({ element, settings, onUp
       )}
       
       {/* Decorative pointer arrow */}
-      <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-sm"></div>
+      <div 
+        className={`absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent drop-shadow-sm ${
+          position === 'top'
+            ? 'top-full border-t-[6px] border-t-white'
+            : 'bottom-full border-b-[6px] border-b-white'
+        }`}
+      ></div>
 
       {/* Delete Button */}
       <div className="border-t border-slate-100 pt-1 mt-1">
