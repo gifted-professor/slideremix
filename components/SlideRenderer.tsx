@@ -165,13 +165,14 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
             }
 
             // 3. Text
-            if (type === 'text' && el.content) {
+            if (type === 'text' && (el.content || settings.content)) {
               if (!showText) return null;
               if (hiddenIds[id]) return null;
               
               const fontSize = settings.fontSize || style.font_size || 20;
               const color = settings.fillColor || style.fill_color || '#000000';
               const align = style.alignment || 'left';
+              const content = settings.content !== undefined ? settings.content : el.content;
               
               return (
                 <foreignObject
@@ -201,9 +202,8 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
                       e.stopPropagation();
                       onSelect && onSelect(id);
                     }}
-                  >
-                    {el.content}
-                  </div>
+                    dangerouslySetInnerHTML={{ __html: content || '' }}
+                  />
                 </foreignObject>
               );
             }

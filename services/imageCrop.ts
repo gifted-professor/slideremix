@@ -51,16 +51,26 @@ export const cropBase64Region = async (
   sw -= Math.floor((insets.left + insets.right) * scaleX);
   sh -= Math.floor((insets.top + insets.bottom) * scaleY);
 
-  sx = Math.max(0, sx);
-  sy = Math.max(0, sy);
-  sw = Math.min(naturalWidth - sx, Math.max(1, sw));
-  sh = Math.min(naturalHeight - sy, Math.max(1, sh));
+
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, sw);
   canvas.height = Math.max(1, sh);
   const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  
+  // Calculate source coordinates (clamp to image bounds)
+  const sourceX = Math.max(0, sx);
+  const sourceY = Math.max(0, sy);
+  const sourceW = Math.min(naturalWidth - sourceX, sw - (sourceX - sx));
+  const sourceH = Math.min(naturalHeight - sourceY, sh - (sourceY - sy));
+  
+  // Calculate destination coordinates (handle negative sx/sy)
+  const destX = sx < 0 ? -sx : 0;
+  const destY = sy < 0 ? -sy : 0;
+  
+  if (sourceW > 0 && sourceH > 0) {
+    ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, destX, destY, sourceW, sourceH);
+  }
 
   // Apply Eraser Regions
   if (options?.eraseRegions && options.eraseRegions.length > 0) {

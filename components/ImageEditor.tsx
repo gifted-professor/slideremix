@@ -37,9 +37,8 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   const insets = localSettings.cropInsets || { top: 0, bottom: 0, left: 0, right: 0 };
   
   const handleInsetChange = (side: keyof typeof insets, value: number) => {
-    // Only allow positive values for crop
-    const safeValue = Math.max(0, value);
-    const newInsets = { ...insets, [side]: safeValue };
+    // Allow negative values for expansion
+    const newInsets = { ...insets, [side]: value };
     setLocalSettings(prev => ({ ...prev, cropInsets: newInsets }));
   };
 

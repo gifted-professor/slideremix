@@ -37,9 +37,43 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({
     }
   };
 
+  const contentEditableRef = React.useRef<HTMLDivElement>(null);
+
+  // Sync content with contentEditable div
+  React.useEffect(() => {
+    if (contentEditableRef.current) {
+      const newContent = settings.content !== undefined ? settings.content : (element.content || '');
+      if (contentEditableRef.current.innerHTML !== newContent) {
+        contentEditableRef.current.innerHTML = newContent;
+      }
+    }
+  }, [element.content, settings.content]);
+
+  const handleApplyColor = (color: string) => {
+    // If selection is inside editor, apply color to selection
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && contentEditableRef.current?.contains(selection.anchorNode)) {
+      document.execCommand('foreColor', false, color);
+      // Update content immediately
+      if (contentEditableRef.current) {
+        onUpdateSettings({ content: contentEditableRef.current.innerHTML });
+      }
+    } else {
+      // Fallback to global setting
+      onUpdateSettings({ fillColor: color });
+    }
+  };
+
+  const handleApplyFontSize = (size: number) => {
+    // Font size command uses 1-7 scale, which is not pixel accurate. 
+    // For precise control, we might need a custom span.
+    // For now, let's just stick to global font size for simplicity as execCommand fontSize is limited.
+    onUpdateSettings({ fontSize: size });
+  };
+
   return (
     <div 
-      className={`absolute left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-xl border border-slate-200 p-2 flex flex-col gap-2 min-w-[200px] z-50 animate-in fade-in duration-200 ${
+      className={`absolute left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-xl border border-slate-200 p-2 flex flex-col gap-2 min-w-[240px] z-50 animate-in fade-in duration-200 ${
         position === 'top' 
           ? 'bottom-[calc(100%+8px)] slide-in-from-bottom-2' 
           : 'top-[calc(100%+8px)] slide-in-from-top-2'
@@ -110,6 +144,21 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({
       {/* Text Specific Info */}
       {element.type === 'text' && (
         <div className="flex flex-col gap-2 pt-1 border-t border-slate-100 mt-1">
+           {/* Text Content Editor */}
+           <div className="px-1">
+             <span className="text-[10px] text-slate-400 font-medium uppercase mb-1 block">Content (Select text to style)</span>
+             <div
+               ref={contentEditableRef}
+               contentEditable
+               onBlur={(e) => onUpdateSettings({ content: e.currentTarget.innerHTML })}
+               className="w-full min-h-[64px] max-h-[120px] overflow-y-auto text-[10px] bg-slate-50 border border-slate-200 rounded p-1 focus:outline-none focus:border-indigo-500 transition-colors whitespace-pre-wrap"
+               style={{ 
+                 color: settings.fillColor || element.style.fill_color || '#000000',
+                 fontSize: '12px' // Fixed size for editing comfort
+               }}
+             />
+           </div>
+
            {/* Font Size Control */}
            <div className="flex items-center gap-2 px-1">
              <span className="text-[10px] text-slate-400 font-medium uppercase w-12">Size</span>
@@ -119,7 +168,7 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({
                max="100" 
                step="1"
                value={settings.fontSize || element.style.font_size || 20}
-               onChange={(e) => onUpdateSettings({ fontSize: parseInt(e.target.value) })}
+               onChange={(e) => handleApplyFontSize(parseInt(e.target.value))}
                className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
              />
              <span className="text-[10px] text-slate-500 w-6 text-right">{settings.fontSize || element.style.font_size || 20}</span>
@@ -132,13 +181,13 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({
                 <input 
                   type="color" 
                   value={settings.fillColor || element.style.fill_color || '#000000'}
-                  onChange={(e) => onUpdateSettings({ fillColor: e.target.value })}
+                  onChange={(e) => handleApplyColor(e.target.value)}
                   className="w-5 h-5 p-0 border-0 rounded cursor-pointer bg-transparent"
                 />
                 <input
                   type="text"
                   value={settings.fillColor || element.style.fill_color || '#000000'}
-                  onChange={(e) => onUpdateSettings({ fillColor: e.target.value })}
+                  onChange={(e) => handleApplyColor(e.target.value)}
                   className="text-[10px] text-slate-500 font-mono uppercase bg-transparent border-none outline-none w-full ml-2"
                 />
              </div>
@@ -203,9 +252,9 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({
                        value={settings.cropInsets?.[side as keyof typeof settings.cropInsets] || 0}
                        onChange={(e) => {
                          const val = parseInt(e.target.value) || 0;
-                         const safeValue = Math.max(0, val);
+                         // Allow negative values for expansion
                          const currentInsets = settings.cropInsets || { top: 0, bottom: 0, left: 0, right: 0 };
-                         const newInsets = { ...currentInsets, [side]: safeValue };
+                         const newInsets = { ...currentInsets, [side]: val };
                          onUpdateSettings({ cropInsets: newInsets });
                        }}
                        className="w-full h-5 text-[10px] bg-slate-50 border border-slate-200 rounded px-1 text-center"
