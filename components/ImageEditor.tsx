@@ -97,6 +97,42 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         setCurrentPath([]);
     }
   };
+  
+  // Global Mouse Handlers for Eraser (to catch out-of-bounds drags)
+  useEffect(() => {
+     if (activeTool !== 'eraser' || !isDrawing) return;
+
+     const handleGlobalUp = () => {
+        handleMouseUp();
+     };
+
+     const handleGlobalMove = (e: MouseEvent) => {
+        if (!imgRef.current) return;
+        
+        // Check if mouse is outside image
+        const rect = imgRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // If outside, we still want to record the point CLAMPED to the edge
+        // This allows dragging "off" the image to erase to the very edge.
+        const constrainedX = Math.max(0, Math.min(x, rect.width));
+        const constrainedY = Math.max(0, Math.min(y, rect.height));
+        
+        const px = (constrainedX / rect.width) * 100;
+        const py = (constrainedY / rect.height) * 100;
+        
+        setCurrentPath(prev => [...prev, { x: px, y: py }]);
+     };
+
+     window.addEventListener('mouseup', handleGlobalUp);
+     window.addEventListener('mousemove', handleGlobalMove);
+
+     return () => {
+        window.removeEventListener('mouseup', handleGlobalUp);
+        window.removeEventListener('mousemove', handleGlobalMove);
+     };
+  }, [activeTool, isDrawing]);
 
   // Crop Tool Logic
   const handleCropMouseDown = (e: React.MouseEvent, handle: string) => {
@@ -423,7 +459,6 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
                 >
                    {/* This shows the live preview of the crop */}
                    {livePreviewUrl ? (
