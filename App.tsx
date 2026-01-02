@@ -170,6 +170,17 @@ const App: React.FC = () => {
     }
   };
 
+  const handleBackgroundChange = (color: string) => {
+    if (!result) return;
+    setResult({
+      ...result,
+      slide_meta: {
+        ...result.slide_meta,
+        background_color: color
+      }
+    });
+  };
+
   const handleConvertAllToImage = async () => {
     if (!result) return;
     
@@ -306,6 +317,8 @@ const App: React.FC = () => {
         setVisualStyle={setVisualStyle} 
         apiKey={apiKey}
         setApiKey={setApiKey}
+        backgroundColor={result?.slide_meta.background_color || '#ffffff'}
+        onBackgroundColorChange={handleBackgroundChange}
       />
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">

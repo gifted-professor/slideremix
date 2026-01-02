@@ -9,9 +9,20 @@ interface SidebarProps {
   setVisualStyle: (style: VisualStyle) => void;
   apiKey: string;
   setApiKey: (key: string) => void;
+  backgroundColor?: string;
+  onBackgroundColorChange?: (color: string) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ mode, setMode, visualStyle, setVisualStyle, apiKey, setApiKey }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  mode, 
+  setMode, 
+  visualStyle, 
+  setVisualStyle, 
+  apiKey, 
+  setApiKey,
+  backgroundColor,
+  onBackgroundColorChange
+}) => {
   return (
     <aside className="w-80 bg-white border-r border-slate-200 h-screen flex flex-col shadow-sm z-10">
       <div className="p-6 border-b border-slate-100">
@@ -113,6 +124,30 @@ const Sidebar: React.FC<SidebarProps> = ({ mode, setMode, visualStyle, setVisual
               <option value="hand_drawn">创意手绘</option>
             </select>
           </div>
+          
+          {/* Background Color Picker */}
+          {onBackgroundColorChange && (
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                <div className="w-3.5 h-3.5 rounded-full border border-slate-300" style={{ backgroundColor: backgroundColor || '#ffffff' }}></div>
+                背景颜色
+              </label>
+              <div className="flex items-center gap-2">
+                 <input 
+                   type="color" 
+                   value={backgroundColor || '#ffffff'}
+                   onChange={(e) => onBackgroundColorChange(e.target.value)}
+                   className="w-10 h-10 p-1 bg-white border border-slate-200 rounded-lg cursor-pointer"
+                 />
+                 <input 
+                   type="text" 
+                   value={backgroundColor || '#ffffff'}
+                   onChange={(e) => onBackgroundColorChange(e.target.value)}
+                   className="flex-1 p-2 rounded-lg border border-slate-300 bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-mono uppercase"
+                 />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
