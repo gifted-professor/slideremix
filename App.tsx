@@ -14,7 +14,7 @@ import { cropBase64Region } from './services/imageCrop';
 const App: React.FC = () => {
   const [mode, setMode] = useState<ProcessMode>('fidelity');
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('original');
-  const [apiKey, setApiKey] = useState<string>('');
+  const [apiKey, setApiKey] = useState<string>(import.meta.env.VITE_GOOGLE_API_KEY || '');
   
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);

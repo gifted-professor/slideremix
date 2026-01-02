@@ -73,7 +73,6 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
               const fill = style.fill_color || '#E2E8F0';
               
               const commonProps = {
-                key: id,
                 fill: fill,
                 fillOpacity: opacity,
                 onClick: (e: React.MouseEvent) => {
@@ -86,6 +85,7 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
               if (el.shape_type === 'circle') {
                 return (
                   <ellipse
+                    key={id}
                     {...commonProps}
                     cx={x + w / 2}
                     cy={y + h / 2}
@@ -97,6 +97,7 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
               // Default to rect/rounded_rect
               return (
                 <rect
+                  key={id}
                   {...commonProps}
                   x={x}
                   y={y}
@@ -120,7 +121,7 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
                     y={finalY}
                     width={finalW}
                     height={finalH}
-                    preserveAspectRatio="xMidYMid meet"
+                    preserveAspectRatio="xMidYMid slice"
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelect && onSelect(id);
