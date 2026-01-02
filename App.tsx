@@ -59,6 +59,11 @@ const App: React.FC = () => {
       
       setHiddenTextIds({});
       setStatus('success');
+      
+      // Play success sound
+      const audio = new Audio('/success.mp3');
+      audio.play().catch(e => console.log('Audio play failed', e));
+      
     } catch (err: any) {
       console.error(err);
       setStatus('error');
