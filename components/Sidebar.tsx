@@ -60,11 +60,24 @@ const Sidebar: React.FC<SidebarProps> = ({
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              onBlur={(e) => {
+                const val = e.target.value.trim();
+                // Only ask if it's a valid looking key (not empty) and different from what's saved
+                if (val && val !== localStorage.getItem('saved_gemini_api_key')) {
+                   // Use a small timeout to avoid blocking UI immediately if they are just tabbing through
+                   setTimeout(() => {
+                     const shouldSave = window.confirm("是否将此 API Key 保存到本地？\n\n保存后，下次访问将自动加载，无需重复输入。");
+                     if (shouldSave) {
+                       localStorage.setItem('saved_gemini_api_key', val);
+                     }
+                   }, 100);
+                }
+              }}
               placeholder="输入您的 Gemini API Key..."
               className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none placeholder:text-slate-400"
             />
             <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-              您的 Key 仅存储在本地浏览器内存中，刷新后失效。
+              支持保存到本地，方便下次自动加载。
             </p>
           </div>
           

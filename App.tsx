@@ -1,20 +1,42 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import UploadZone from './components/UploadZone';
 import SlideRenderer from './components/SlideRenderer';
 import SelectionOverlay from './components/SelectionOverlay';
 import ImageEditor from './components/ImageEditor';
+import TextEditor from './components/TextEditor';
 import { analyzeSlide, fileToGenerativePart, remixElementImage } from './services/geminiService';
+import { parseHtmlToPptxRuns } from './services/htmlParser';
 import { ProcessMode, VisualStyle, SlideData, AnalysisStatus, ElementSettings } from './types';
-import { Code, Layout, Loader2, ArrowRight, AlertCircle, Presentation } from 'lucide-react';
+import { Code, Layout, Loader2, ArrowRight, AlertCircle, Presentation, LogOut, User as UserIcon } from 'lucide-react';
 // @ts-ignore
 import pptxgen from 'pptxgenjs';
 import { cropBase64Region } from './services/imageCrop';
 
+import LoginPage from './components/LoginPage';
+import { authAdapter } from './services/authAdapter';
+
 const App: React.FC = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  
+  // Check auth on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const user = await authAdapter.getCurrentUser();
+      if (user) {
+        setUserEmail(user.email);
+        setIsLoggedIn(true);
+      }
+    };
+    checkAuth();
+  }, []);
+
   const [mode, setMode] = useState<ProcessMode>('fidelity');
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('original');
-  const [apiKey, setApiKey] = useState<string>(import.meta.env.VITE_GOOGLE_API_KEY || '');
+  const [apiKey, setApiKey] = useState<string>(() => {
+    return localStorage.getItem('saved_gemini_api_key') || import.meta.env.VITE_GOOGLE_API_KEY || '';
+  });
   
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -33,6 +55,33 @@ const App: React.FC = () => {
   const [showText, setShowText] = useState<boolean>(true);
   
   const [editingImageId, setEditingImageId] = useState<string | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const rendererContainerRef = useRef<HTMLDivElement>(null);
+  const [containerScale, setContainerScale] = useState(1);
+
+  // Update scale on resize
+  useEffect(() => {
+    const updateScale = () => {
+      if (rendererContainerRef.current) {
+        setContainerScale(rendererContainerRef.current.clientWidth / 1000);
+      }
+    };
+    
+    // Initial update
+    updateScale();
+    
+    // Observer for robust size tracking
+    const observer = new ResizeObserver(updateScale);
+    if (rendererContainerRef.current) {
+       observer.observe(rendererContainerRef.current);
+    }
+    
+    window.addEventListener('resize', updateScale);
+    return () => {
+       window.removeEventListener('resize', updateScale);
+       observer.disconnect();
+    };
+  }, [status, activeTab]);
 
   const handleFileSelected = useCallback(async (selectedFile: File) => {
     setFile(selectedFile);
@@ -285,17 +334,27 @@ const App: React.FC = () => {
         }
         else if (el.type === 'text' && el.content && showText && !hiddenTextIds[el.id]) {
           const fontSizePt = fontSize * 0.72;
-
-          slide.addText(el.content, {
-            x, y, w, h,
+          
+          const baseOptions = {
             fontSize: fontSizePt,
             color: color,
             bold: style.is_bold,
             align: style.alignment || 'left',
             fontFace: "Microsoft YaHei",
-            valign: "top",
+            valign: "top" as const,
             autoFit: true, 
-          });
+          };
+
+          if (/<[a-z][\s\S]*>/i.test(el.content)) {
+             const runs = parseHtmlToPptxRuns(el.content, baseOptions);
+             // @ts-ignore
+             slide.addText(runs, { x, y, w, h, ...baseOptions });
+          } else {
+             slide.addText(el.content, {
+               x, y, w, h,
+               ...baseOptions
+             });
+          }
         }
       });
 
@@ -313,6 +372,27 @@ const App: React.FC = () => {
     setStatus('idle');
   };
 
+  const handleTextDoubleClick = (id: string) => {
+    const el = result?.elements.find(e => e.id === id);
+    if (el && el.type === 'text') {
+       setEditingTextId(id);
+       if (rendererContainerRef.current) {
+         setContainerScale(rendererContainerRef.current.clientWidth / 1000);
+       }
+    }
+  };
+
+  const handleLogout = async () => {
+    await authAdapter.signOut();
+    setIsLoggedIn(false);
+    setUserEmail('');
+    handleReset();
+  };
+
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={(email) => { setUserEmail(email); setIsLoggedIn(true); }} />;
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar 
@@ -328,33 +408,63 @@ const App: React.FC = () => {
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-20">
-          <h2 className="text-lg font-semibold text-slate-800">
-            {status === 'idle' ? '仪表盘' : '工作区'}
-          </h2>
-          {status === 'success' && (
-            <div className="flex gap-2">
-              <button 
-                onClick={handleConvertAllToImage}
-                className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-              >
-                <Layout size={16} />
-                显示所有图片
-              </button>
-              <button 
-                onClick={() => setShowText(!showText)}
-                className={`flex items-center gap-2 ${showText ? 'bg-slate-200 text-slate-800' : 'bg-white'} border border-slate-300 px-4 py-2 rounded-lg text-sm transition-colors`}
-              >
-                {showText ? '隐藏文本' : '显示文本'}
-              </button>
-              <button 
-                onClick={handleDownloadPptx}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-              >
-                <Presentation size={16} />
-                导出 PPTX (Beta)
-              </button>
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold text-slate-800">
+              {status === 'idle' ? '仪表盘' : '工作区'}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-6">
+            {status === 'success' && (
+              <div className="flex gap-2 border-r border-slate-200 pr-6">
+                <button 
+                  onClick={handleConvertAllToImage}
+                  className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                  title="显示所有图片"
+                >
+                  <Layout size={16} />
+                  <span className="hidden xl:inline">全部图片化</span>
+                </button>
+                <button 
+                  onClick={() => setShowText(!showText)}
+                  className={`flex items-center gap-2 ${showText ? 'bg-slate-200 text-slate-800' : 'bg-white'} border border-slate-300 px-3 py-1.5 rounded-lg text-sm transition-colors`}
+                >
+                  <span className="font-bold text-xs">T</span>
+                  <span className="hidden xl:inline">{showText ? '隐藏文本' : '显示文本'}</span>
+                </button>
+                <button 
+                  onClick={handleDownloadPptx}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                >
+                  <Presentation size={16} />
+                  <span className="hidden lg:inline">导出 PPTX</span>
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+               <div className="flex flex-col items-end hidden sm:flex">
+                 <span className="text-sm font-medium text-slate-700 leading-tight">
+                    {userEmail.split('@')[0]}
+                 </span>
+                 <span className="text-[10px] text-slate-400 leading-tight">
+                    {userEmail}
+                 </span>
+               </div>
+               
+               <div className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold border border-indigo-200 shadow-sm">
+                 {userEmail ? userEmail[0].toUpperCase() : <UserIcon size={16} />}
+               </div>
+
+               <button 
+                 onClick={handleLogout}
+                 className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all ml-1"
+                 title="退出登录"
+               >
+                 <LogOut size={18} />
+               </button>
             </div>
-          )}
+          </div>
         </header>
 
         <div className="flex-1 overflow-auto p-8">
@@ -451,12 +561,13 @@ const App: React.FC = () => {
                     <div className="flex-1 overflow-auto p-4 custom-scrollbar">
                       {activeTab === 'preview' ? (
                         <div className="w-full flex items-center justify-center min-h-full">
-                           <div style={{containerType: 'inline-size'}} className="w-full relative aspect-video shadow-lg bg-white">
+                           <div ref={rendererContainerRef} style={{containerType: 'inline-size'}} className="w-full relative aspect-video shadow-lg bg-white">
                               <SlideRenderer 
                                 data={result} 
                                 elementSettings={elementSettingsMap}
                                 images={imageByElementId}
                                 onSelect={setSelectedId}
+                                onDoubleClick={handleTextDoubleClick}
                                 hiddenIds={hiddenTextIds}
                                 onToggleText={toggleTextHidden}
                                 showText={showText}
@@ -468,7 +579,47 @@ const App: React.FC = () => {
                                 onUpdateSettings={handleElementSettingsUpdate}
                                 onOpenEditor={setEditingImageId}
                                 onClose={() => setSelectedId(null)}
+                                onDoubleClick={handleTextDoubleClick}
                               />
+                              
+                              {/* Text Editor Overlay */}
+                              {editingTextId && result && (() => {
+                                  const el = result.elements.find(e => e.id === editingTextId);
+                                  const settings = elementSettingsMap[editingTextId] || {};
+                                  if (!el) return null;
+                                  
+                                  const fontSize = settings.fontSize || el.style.font_size || 20;
+                                  const color = settings.fillColor || el.style.fill_color || '#000000';
+                                  const content = settings.content !== undefined ? settings.content : el.content;
+                                  
+                                  const x = settings.x !== undefined ? settings.x : el.position.x;
+                                  const y = settings.y !== undefined ? settings.y : el.position.y;
+                                  const w = settings.width !== undefined ? settings.width : el.position.width;
+                                  const h = settings.height !== undefined ? settings.height : el.position.height;
+
+                                  return (
+                                     <TextEditor
+                                        initialHtml={content || ''}
+                                        x={x}
+                                        y={y}
+                                        width={w}
+                                        height={h}
+                                        baseStyle={{
+                                           fontSize,
+                                           color,
+                                           textAlign: el.style.alignment || 'left',
+                                           fontWeight: el.style.is_bold ? 700 : 400,
+                                           fontFamily: 'Microsoft YaHei, Inter, sans-serif'
+                                        }}
+                                        scale={containerScale}
+                                        onSave={(html) => {
+                                           handleElementSettingsUpdate(editingTextId, { content: html });
+                                           setEditingTextId(null);
+                                        }}
+                                        onCancel={() => setEditingTextId(null)}
+                                     />
+                                  );
+                              })()}
                             </div>
                         </div>
                       ) : (

@@ -9,6 +9,7 @@ interface SelectionOverlayProps {
   onUpdateSettings: (id: string, settings: Partial<ElementSettings>) => void;
   onOpenEditor?: (id: string) => void;
   onClose: () => void;
+  onDoubleClick?: (id: string) => void;
 }
 
 const SelectionOverlay: React.FC<SelectionOverlayProps> = ({ 
@@ -17,7 +18,8 @@ const SelectionOverlay: React.FC<SelectionOverlayProps> = ({
   elementSettings,
   onUpdateSettings,
   onOpenEditor,
-  onClose
+  onClose,
+  onDoubleClick
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -117,6 +119,12 @@ const SelectionOverlay: React.FC<SelectionOverlayProps> = ({
         }}
         onMouseDown={handleMouseDown}
         onClick={(e) => e.stopPropagation()} 
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (selectedId && onDoubleClick) {
+             onDoubleClick(selectedId);
+          }
+        }}
       >
         {/* Resize Handles (Visual only for now) */}
         <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-indigo-500 rounded-full shadow-sm"></div>

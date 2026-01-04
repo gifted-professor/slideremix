@@ -1,6 +1,6 @@
 import React from 'react';
 import { SlideElement, ElementSettings } from '../types';
-import { X, Image as ImageIcon, Box, Scissors, Check, Type, Trash2, Edit } from 'lucide-react';
+import { X, Image as ImageIcon, Box, Scissors, Check, Type, Trash2, Edit, Bold, Italic } from 'lucide-react';
 
 interface ElementToolbarProps {
   element: SlideElement;
@@ -65,10 +65,44 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({
   };
 
   const handleApplyFontSize = (size: number) => {
-    // Font size command uses 1-7 scale, which is not pixel accurate. 
-    // For precise control, we might need a custom span.
-    // For now, let's just stick to global font size for simplicity as execCommand fontSize is limited.
-    onUpdateSettings({ fontSize: size });
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && contentEditableRef.current?.contains(selection.anchorNode) && !selection.isCollapsed) {
+       // Apply to selection
+       // Use the font size hack
+       document.execCommand('fontSize', false, '7');
+       const fontElements = contentEditableRef.current?.getElementsByTagName('font');
+       if (fontElements) {
+         for (let i = 0; i < fontElements.length; i++) {
+           const el = fontElements[i];
+           if (el.getAttribute('size') === '7') {
+             el.removeAttribute('size');
+             el.style.fontSize = `${size}px`;
+           }
+         }
+       }
+       // Span fallback
+       const spans = contentEditableRef.current?.querySelectorAll('span[style*="font-size: xxx-large"]');
+       spans?.forEach(span => {
+           (span as HTMLElement).style.fontSize = `${size}px`;
+       });
+       
+       if (contentEditableRef.current) {
+         onUpdateSettings({ content: contentEditableRef.current.innerHTML });
+       }
+    } else {
+       // Global setting
+       onUpdateSettings({ fontSize: size });
+    }
+  };
+
+  const handleFormat = (command: string) => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && contentEditableRef.current?.contains(selection.anchorNode)) {
+      document.execCommand(command, false);
+      if (contentEditableRef.current) {
+        onUpdateSettings({ content: contentEditableRef.current.innerHTML });
+      }
+    }
   };
 
   return (
@@ -146,7 +180,17 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({
         <div className="flex flex-col gap-2 pt-1 border-t border-slate-100 mt-1">
            {/* Text Content Editor */}
            <div className="px-1">
-             <span className="text-[10px] text-slate-400 font-medium uppercase mb-1 block">Content (Select text to style)</span>
+             <div className="flex justify-between items-center mb-1">
+               <span className="text-[10px] text-slate-400 font-medium uppercase">Content (Select text to style)</span>
+               <div className="flex gap-1">
+                 <button onClick={() => handleFormat('bold')} className="p-0.5 hover:bg-slate-200 rounded" title="Bold">
+                   <Bold size={12} className="text-slate-600" />
+                 </button>
+                 <button onClick={() => handleFormat('italic')} className="p-0.5 hover:bg-slate-200 rounded" title="Italic">
+                   <Italic size={12} className="text-slate-600" />
+                 </button>
+               </div>
+             </div>
              <div
                ref={contentEditableRef}
                contentEditable

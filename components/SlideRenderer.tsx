@@ -6,6 +6,7 @@ interface SlideRendererProps {
   elementSettings?: Record<string, ElementSettings>;
   images?: Record<string, { url: string; base64?: string }>;
   onSelect?: (id: string) => void;
+  onDoubleClick?: (id: string) => void;
   hiddenIds?: Record<string, boolean>;
   onToggleText?: (id: string) => void;
   showText?: boolean;
@@ -16,6 +17,7 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
   elementSettings = {}, 
   images = {}, 
   onSelect, 
+  onDoubleClick,
   hiddenIds = {}, 
   onToggleText, 
   showText = true 
@@ -202,6 +204,10 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelect && onSelect(id);
+                    }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      onDoubleClick && onDoubleClick(id);
                     }}
                     dangerouslySetInnerHTML={{ __html: content || '' }}
                   />
