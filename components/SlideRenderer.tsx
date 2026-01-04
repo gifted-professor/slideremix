@@ -1,6 +1,8 @@
 import React from 'react';
 import { SlideData, ElementSettings } from '../types';
 
+import { Image as ImageIcon } from 'lucide-react';
+
 interface SlideRendererProps {
   data: SlideData;
   elementSettings?: Record<string, ElementSettings>;
@@ -158,9 +160,10 @@ const SlideRenderer: React.FC<SlideRendererProps> = ({
                     height={finalH}
                     style={{ pointerEvents: 'none' }} // Let click pass to group
                   >
-                    <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
-                       <span className="text-[10px] font-bold text-slate-400 uppercase">Image</span>
-                       <span className="text-[8px] text-slate-500 line-clamp-2 leading-tight mt-1">{el.semantic_desc}</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-slate-400">
+                       <ImageIcon size={24} className="mb-1 opacity-50" />
+                       <span className="text-[10px] font-bold uppercase tracking-wider">Image Placeholder</span>
+                       <span className="text-[8px] text-slate-500 line-clamp-2 leading-tight mt-1 px-1">{el.semantic_desc}</span>
                     </div>
                   </foreignObject>
                 </g>

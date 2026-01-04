@@ -8,13 +8,16 @@ import TextEditor from './components/TextEditor';
 import { analyzeSlide, fileToGenerativePart, remixElementImage } from './services/geminiService';
 import { parseHtmlToPptxRuns } from './services/htmlParser';
 import { ProcessMode, VisualStyle, SlideData, AnalysisStatus, ElementSettings } from './types';
-import { Code, Layout, Loader2, ArrowRight, AlertCircle, Presentation, LogOut, User as UserIcon } from 'lucide-react';
+import { Code, Layout, Loader2, ArrowRight, AlertCircle, Presentation, LogOut, User as UserIcon, Save, FolderOpen, Upload } from 'lucide-react';
 // @ts-ignore
 import pptxgen from 'pptxgenjs';
 import { cropBase64Region } from './services/imageCrop';
 
 import LoginPage from './components/LoginPage';
 import { authAdapter } from './services/authAdapter';
+import { dbService, Project } from './services/database';
+import ProjectList from './components/ProjectList';
+import SaveProjectModal from './components/SaveProjectModal';
 
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -58,6 +61,8 @@ const App: React.FC = () => {
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const rendererContainerRef = useRef<HTMLDivElement>(null);
   const [containerScale, setContainerScale] = useState(1);
+  const [showProjectList, setShowProjectList] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   // Update scale on resize
   useEffect(() => {
@@ -83,8 +88,28 @@ const App: React.FC = () => {
     };
   }, [status, activeTab]);
 
+  const handleReuploadOriginal = useCallback(async (selectedFile: File) => {
+    try {
+      const base64Data = await fileToGenerativePart(selectedFile);
+      setBase64Original(base64Data);
+      
+      const img = new Image();
+      img.src = `data:image/jpeg;base64,${base64Data}`;
+      await new Promise((r) => { if (img.complete) r(null); else img.onload = () => r(null); });
+      setNaturalSize({ w: img.naturalWidth || img.width, h: img.naturalHeight || img.height });
+      
+      // Update preview URL
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setPreviewUrl(objectUrl);
+      
+      alert("原图已更新！现在可以使用“全部图片化”和图像裁剪功能了。");
+    } catch (err) {
+      console.error(err);
+      alert("上传失败，请重试。");
+    }
+  }, []);
+
   const handleFileSelected = useCallback(async (selectedFile: File) => {
-    setFile(selectedFile);
     const objectUrl = URL.createObjectURL(selectedFile);
     setPreviewUrl(objectUrl);
     setResult(null);
@@ -238,6 +263,12 @@ const App: React.FC = () => {
   const handleConvertAllToImage = async () => {
     if (!result) return;
     
+    // If no original image (loaded from project without blob), warn user
+    if (!base64Original) {
+      alert("此项目是从数据库加载的，由于未保存原始高清图片，无法重新生成图片裁剪。仅支持编辑文本和矢量形状。");
+      return;
+    }
+    
     const newSettingsMap = { ...elementSettingsMap };
     const updates: Promise<void>[] = [];
     
@@ -365,6 +396,63 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSaveProjectClick = () => {
+    if (!result || !authAdapter.isSupabaseEnabled) {
+      if (!authAdapter.isSupabaseEnabled) alert("请先配置 Supabase 数据库以使用保存功能。");
+      return;
+    }
+    setShowSaveModal(true);
+  };
+
+  const handleSaveProjectConfirm = async (title: string) => {
+    if (!result) return;
+    
+    try {
+      await dbService.saveProject(title, result, elementSettingsMap, previewUrl || undefined);
+      setShowSaveModal(false);
+      alert("项目保存成功！");
+    } catch (error: any) {
+      console.error(error);
+      alert("保存失败: " + error.message);
+    }
+  };
+
+  const handleLoadProject = (project: Project) => {
+    setShowProjectList(false);
+    setResult(project.slide_data);
+    
+    // Auto-fallback: If renderMode is 'image' but we don't have the blob, revert to 'svg'
+    // so user sees color placeholders instead of empty space
+    const sanitizedSettings: Record<string, ElementSettings> = {};
+    Object.entries(project.element_settings).forEach(([id, settings]) => {
+       if (settings.renderMode === 'image') {
+         sanitizedSettings[id] = { ...settings, renderMode: 'svg' };
+       } else {
+         sanitizedSettings[id] = settings;
+       }
+    });
+    setElementSettingsMap(sanitizedSettings);
+    
+    // Force clear hidden text IDs since we are falling back to SVG mode
+    // (Image mode usually hides underlying text, but now we don't have images)
+    setHiddenTextIds({});
+    
+    // Set preview URL to the thumbnail URL if available, otherwise clear it
+    // This helps show *something* in the "Original Source" area
+    if (project.thumbnail_url) {
+      setPreviewUrl(project.thumbnail_url);
+    } else {
+      setPreviewUrl(null); 
+    }
+    
+    // Reset heavy blobs as they are not persisted
+    setImageByElementId({});
+    setBase64Original(null);
+    setNaturalSize(null);
+    
+    setStatus('success');
+  };
+
   const handleReset = () => {
     setFile(null);
     setPreviewUrl(null);
@@ -415,6 +503,15 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setShowProjectList(true)}
+              className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors text-sm"
+              title="打开项目列表"
+            >
+              <FolderOpen size={18} />
+              <span className="hidden lg:inline font-medium">我的项目</span>
+            </button>
+
             {status === 'success' && (
               <div className="flex gap-2 border-r border-slate-200 pr-6">
                 <button 
@@ -439,6 +536,15 @@ const App: React.FC = () => {
                   <Presentation size={16} />
                   <span className="hidden lg:inline">导出 PPTX</span>
                 </button>
+                {authAdapter.isSupabaseEnabled && (
+                  <button 
+                    onClick={handleSaveProjectClick}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm ml-2"
+                  >
+                    <Save size={16} />
+                    <span className="hidden lg:inline">保存项目</span>
+                  </button>
+                )}
               </div>
             )}
 
@@ -475,6 +581,22 @@ const App: React.FC = () => {
                  <p className="text-slate-500 text-lg">上传静态截图，自动分析矢量形状与复杂图像，生成 1:1 SVG 复刻。</p>
                </div>
                <UploadZone onFileSelected={handleFileSelected} />
+
+               {/* Recent Projects Quick Access */}
+               <div className="mt-12 pt-8 border-t border-slate-200">
+                 <div className="flex items-center justify-center gap-2 mb-4">
+                    <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">最近项目</h3>
+                 </div>
+                 <div className="flex justify-center">
+                   <button 
+                     onClick={() => setShowProjectList(true)}
+                     className="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center gap-2 hover:underline"
+                   >
+                     <FolderOpen size={16} />
+                     查看所有保存的项目
+                   </button>
+                 </div>
+               </div>
             </div>
           )}
 
@@ -487,13 +609,51 @@ const App: React.FC = () => {
                   <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">原始来源</h3>
                   <button onClick={handleReset} className="text-xs text-slate-400 hover:text-red-500">清除</button>
                 </div>
-                <div className="flex-1 relative bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center border border-slate-100">
-                   {previewUrl && (
-                     <img 
-                       src={previewUrl} 
-                       alt="Original Slide" 
-                       className="max-w-full max-h-full object-contain"
-                     />
+                <div className="flex-1 relative bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center border border-slate-100 group">
+                   {previewUrl ? (
+                     <>
+                        <img 
+                          src={previewUrl} 
+                          alt="Original Slide" 
+                          className="max-w-full max-h-full object-contain"
+                        />
+                        {/* Re-upload overlay for restored projects */}
+                        {!base64Original && (
+                          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity p-4">
+                             <p className="text-white text-sm font-medium mb-3 text-center">
+                               此项目缺少高清原图<br/>上传原图以启用裁剪功能
+                             </p>
+                             <label className="cursor-pointer bg-white text-slate-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-2">
+                               <Upload size={16} />
+                               上传原图
+                               <input 
+                                 type="file" 
+                                 className="hidden" 
+                                 accept="image/*"
+                                 onChange={(e) => {
+                                   if (e.target.files?.[0]) handleReuploadOriginal(e.target.files[0]);
+                                 }}
+                               />
+                             </label>
+                          </div>
+                        )}
+                     </>
+                   ) : (
+                      <div className="text-center p-6">
+                         <p className="text-slate-400 text-sm mb-4">暂无原图预览</p>
+                         <label className="cursor-pointer bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors inline-flex items-center gap-2 shadow-sm">
+                           <Upload size={16} />
+                           上传高清原图
+                           <input 
+                             type="file" 
+                             className="hidden" 
+                             accept="image/*"
+                             onChange={(e) => {
+                               if (e.target.files?.[0]) handleReuploadOriginal(e.target.files[0]);
+                             }}
+                           />
+                         </label>
+                      </div>
                    )}
                 </div>
               </div>
@@ -637,15 +797,31 @@ const App: React.FC = () => {
         </div>
         
         {/* Full Screen Image Editor Modal */}
-        {editingImageId && result && base64Original && (
+        {editingImageId && result && (
           <ImageEditor 
             element={result.elements.find(e => e.id === editingImageId)!}
             settings={elementSettingsMap[editingImageId] || {}}
-            originalImageBase64={base64Original}
+            originalImageBase64={base64Original || ''}
             onSave={(newSettings) => handleElementSettingsUpdate(editingImageId, newSettings)}
             onClose={() => setEditingImageId(null)}
             previewUrl={imageByElementId[editingImageId]?.url}
             onPreviewRequest={(settings) => generateElementImage(editingImageId, settings)}
+          />
+        )}
+
+        {/* Project List Modal */}
+        {showProjectList && (
+          <ProjectList 
+            onLoadProject={handleLoadProject}
+            onClose={() => setShowProjectList(false)}
+          />
+        )}
+
+        {/* Save Project Modal */}
+        {showSaveModal && (
+          <SaveProjectModal
+            onSave={handleSaveProjectConfirm}
+            onClose={() => setShowSaveModal(false)}
           />
         )}
       </main>

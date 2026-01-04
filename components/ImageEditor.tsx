@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SlideElement, ElementSettings } from '../types';
-import { X, Check, Scissors, RotateCcw, ZoomIn, Box, Eraser, MousePointer2, Crop, Loader2 } from 'lucide-react';
+import { X, Check, Scissors, RotateCcw, ZoomIn, Box, Eraser, MousePointer2, Crop, Loader2, AlertCircle } from 'lucide-react';
 
 const SLIDE_VIEWBOX_W = 1000;
 const SLIDE_VIEWBOX_H = 562.5;
@@ -297,6 +297,13 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   };
 
   useEffect(() => {
+    // If we don't have original image data, we can't generate a preview
+    if (!originalImageBase64) {
+      setLivePreviewUrl(undefined);
+      setIsLoadingPreview(false);
+      return;
+    }
+
     if (!onPreviewRequest) return;
 
     const timer = setTimeout(async () => {
@@ -310,7 +317,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timer);
-  }, [localSettings, onPreviewRequest]);
+  }, [localSettings, onPreviewRequest, originalImageBase64]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm animate-in fade-in duration-200">
@@ -470,11 +477,21 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
                        draggable={false}
                      />
                    ) : (
-                     <div className="w-96 h-64 flex items-center justify-center text-slate-400">
-                       <span className="flex items-center gap-2">
-                         <Loader2 size={20} className="animate-spin" />
-                         Generating Preview...
-                       </span>
+                     <div className="w-96 h-64 flex flex-col items-center justify-center text-slate-400 gap-4">
+                       {!originalImageBase64 ? (
+                         <>
+                           <AlertCircle size={32} className="text-amber-400" />
+                           <div className="text-center">
+                             <p className="text-sm font-medium text-slate-600">无法预览裁剪结果</p>
+                             <p className="text-xs text-slate-400 mt-1 max-w-[200px]">此项目缺少高清原图，无法进行图片裁剪。请在工作区上传原图。</p>
+                           </div>
+                         </>
+                       ) : (
+                         <span className="flex items-center gap-2">
+                           <Loader2 size={20} className="animate-spin" />
+                           Generating Preview...
+                         </span>
+                       )}
                      </div>
                    )}
 

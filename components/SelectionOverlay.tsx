@@ -126,6 +126,10 @@ const SelectionOverlay: React.FC<SelectionOverlayProps> = ({
           }
         }}
       >
+        {/* Only show resize handles if we are NOT in fallback SVG mode from a missing image */}
+        {/* We can infer this: if settings.renderMode is 'image' but we are actually seeing an SVG placeholder, it might be confusing. */}
+        {/* But generally, handles are always good. */}
+        
         {/* Resize Handles (Visual only for now) */}
         <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-indigo-500 rounded-full shadow-sm"></div>
         <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-indigo-500 rounded-full shadow-sm"></div>
@@ -133,6 +137,8 @@ const SelectionOverlay: React.FC<SelectionOverlayProps> = ({
         <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-indigo-500 rounded-full shadow-sm"></div>
 
         {/* Toolbar - Prevent drag propagation from toolbar */}
+        {/* Also pass 'disabled' prop to toolbar if image mode is requested but not available? */}
+        {/* The toolbar itself handles switching modes. */}
         <div onMouseDown={(e) => e.stopPropagation()}>
           <ElementToolbar 
             element={element}

@@ -20,6 +20,15 @@ const ElementToolbar: React.FC<ElementToolbarProps> = ({
   position = 'top' 
 }) => {
   const isImage = settings.renderMode === 'image';
+  // Check if we are in a fallback state where image mode is requested but no blob is available
+  // This is passed down indirectly - usually if image mode is active but we don't have the image data rendered,
+  // we might want to disable the toggle or show a warning. 
+  // However, simpler is to just disable the Image button if we detect we are in a "restored project without blob" state.
+  // We can detect this by checking if a global "hasOriginalImage" flag is false, but we don't have access to global state here.
+  // Instead, let's rely on the parent component to handle the logic or just let the user try and fail (with the alert we added in App.tsx).
+  
+  // Actually, for better UX, let's just make sure the UI reflects the current reality.
+  // If the user clicks "Image", App.tsx will try to generate it. If it fails (because no blob), it stays in SVG mode or shows alert.
 
   const getIcon = () => {
     switch (element.type) {
