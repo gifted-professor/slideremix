@@ -492,6 +492,10 @@ const App: React.FC = () => {
         setApiKey={setApiKey}
         backgroundColor={result?.slide_meta.background_color || '#ffffff'}
         onBackgroundColorChange={handleBackgroundChange}
+        status={status}
+        onConvertAllToImage={handleConvertAllToImage}
+        showText={showText}
+        onToggleShowText={() => setShowText(!showText)}
       />
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
@@ -514,21 +518,6 @@ const App: React.FC = () => {
 
             {status === 'success' && (
               <div className="flex gap-2 border-r border-slate-200 pr-6">
-                <button 
-                  onClick={handleConvertAllToImage}
-                  className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                  title="显示所有图片"
-                >
-                  <Layout size={16} />
-                  <span className="hidden xl:inline">全部图片化</span>
-                </button>
-                <button 
-                  onClick={() => setShowText(!showText)}
-                  className={`flex items-center gap-2 ${showText ? 'bg-slate-200 text-slate-800' : 'bg-white'} border border-slate-300 px-3 py-1.5 rounded-lg text-sm transition-colors`}
-                >
-                  <span className="font-bold text-xs">T</span>
-                  <span className="hidden xl:inline">{showText ? '隐藏文本' : '显示文本'}</span>
-                </button>
                 <button 
                   onClick={handleDownloadPptx}
                   className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
