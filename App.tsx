@@ -23,6 +23,8 @@ const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   
+  const [isPro, setIsPro] = useState(false);
+
   // Check auth on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -33,6 +35,29 @@ const App: React.FC = () => {
       }
     };
     checkAuth();
+
+    // Check for payment status in URL
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment');
+    
+    if (paymentStatus === 'success') {
+      alert('感谢您的订阅！您现在是专业版用户。');
+      setIsPro(true);
+      // Ensure we stay logged in
+      const checkAuth = async () => {
+        const user = await authAdapter.getCurrentUser();
+        if (user) {
+          setUserEmail(user.email);
+          setIsLoggedIn(true);
+        }
+      };
+      checkAuth();
+      
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (paymentStatus === 'cancel') {
+      alert('订阅已取消。');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
 
   const [mode, setMode] = useState<ProcessMode>('fidelity');
@@ -496,6 +521,7 @@ const App: React.FC = () => {
         onConvertAllToImage={handleConvertAllToImage}
         showText={showText}
         onToggleShowText={() => setShowText(!showText)}
+        isPro={isPro}
       />
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">

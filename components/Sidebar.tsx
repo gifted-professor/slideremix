@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ProcessMode, VisualStyle, AnalysisStatus } from '../types';
 import { Settings, Scissors, Palette, Wand2, Key, ExternalLink, Layout, Type, ChevronUp, ChevronDown } from 'lucide-react';
+import PricingModal from './PricingModal';
 
 interface SidebarProps {
   mode: ProcessMode;
@@ -15,6 +16,7 @@ interface SidebarProps {
   onConvertAllToImage: () => void;
   showText: boolean;
   onToggleShowText: () => void;
+  isPro?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -29,9 +31,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   status,
   onConvertAllToImage,
   showText,
-  onToggleShowText
+  onToggleShowText,
+  isPro
 }) => {
   const [showConfig, setShowConfig] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
 
   return (
     <aside className="w-80 bg-white border-r border-slate-200 h-screen flex flex-col shadow-sm z-10">
@@ -39,6 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center gap-2 mb-1">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">S</div>
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">SlideRemix</h1>
+          {isPro && <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-wide">PRO</span>}
         </div>
         <p className="text-xs text-slate-500 pl-10">AI 幻灯片重构引擎</p>
       </div>
@@ -228,12 +233,24 @@ const Sidebar: React.FC<SidebarProps> = ({
               <h3 className="text-xs font-bold text-slate-500 mb-2 uppercase">使用统计</h3>
               <div className="flex justify-between text-xs text-slate-600 mb-1">
                 <span>配额</span>
-                <span className="font-medium">免费版</span>
+                <span className="font-medium">{isPro ? '无限' : '免费版'}</span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-1.5 mb-2">
-                <div className="bg-indigo-500 h-1.5 rounded-full w-[15%]"></div>
+                <div className={`h-1.5 rounded-full w-[15%] ${isPro ? 'bg-emerald-500 w-full' : 'bg-indigo-500'}`}></div>
               </div>
-              <p className="text-[10px] text-slate-400">升级到 Pro 版以进行批量处理。</p>
+              {!isPro ? (
+                <>
+                  <p className="text-[10px] text-slate-400 mb-3">升级到 Pro 版以进行批量处理。</p>
+                  <button 
+                    onClick={() => setShowPricing(true)}
+                    className="w-full py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                  >
+                    立即升级
+                  </button>
+                </>
+              ) : (
+                <p className="text-[10px] text-emerald-600 font-medium">您已解锁全部 Pro 功能 ✨</p>
+              )}
             </div>
           </div>
         )}
@@ -242,6 +259,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-4 border-t border-slate-100 text-[10px] text-slate-400 text-center">
         由 Google Gemini 2.5 提供支持
       </div>
+
+      <PricingModal isOpen={showPricing} onClose={() => setShowPricing(false)} />
     </aside>
   );
 };
